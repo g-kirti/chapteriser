@@ -72,41 +72,6 @@ func Run(cfg Config) error {
 		return err
 	}
 
-	// special splitter functionality with user provided metadata
-	if resolved.SplitAudio && resolved.MetadataInputAbs != "" {
-		log.Printf("[mux] Splitting audio file using provided metadata: %s", resolved.MetadataInputAbs)
-		probe, err := media.ProbeInput(resolved.InputAbs)
-		if err != nil {
-			return err
-		}
-		if err := media.SplitAudioFile(media.SplitOptions{
-			InputPath:              resolved.InputAbs,
-			MetadataPath:           resolved.MetadataInputAbs,
-			OutputDir:              resolved.OutputAbs,
-			AttachedPicStreamIndex: probe.AttachedPicStreamIndex,
-			IncludeCover:           probe.HasAttachedPic,
-		}); err != nil {
-			return err
-		}
-		log.Printf("[mux] Done. Split audio written to %s", resolved.OutputAbs)
-		return nil
-	}
-
-	// initiate temporary workspace to store metadata and chunks
-	ws, err := workspace.New(resolved.TempDirAbs, "chapteriser-*", resolved.KeepTemp)
-	if err != nil {
-		return fmt.Errorf("Failed to create temp dir: %w", err)
-	} else {
-		log.Printf("[run] Creating temp dir: %s", ws.Dir)
-	}
-	if resolved.KeepTemp {
-		log.Printf("[run] Keeping temp dir: %s", ws.Dir)
-	}
-	defer ws.Cleanup()
-
-	// create temporary files
-	metadataPath := ws.Path("ffmetadata.txt")
-
 	// probe metadata
 	chunkSeconds := resolved.ChunkMinutes * 60
 	probe, err := media.ProbeInput(resolved.InputAbs)
@@ -130,6 +95,51 @@ func Run(cfg Config) error {
 	}
 
 	log.Println("[probe] Metadata checked")
+
+	// skip detection if user provides metadata
+	if resolved.SplitAudio && resolved.MetadataInputAbs != "" {
+		log.Printf("[mux] Splitting audio file using provided metadata: %s", resolved.MetadataInputAbs)
+		if err := media.SplitAudioFile(media.SplitOptions{
+			InputPath:              resolved.InputAbs,
+			MetadataPath:           resolved.MetadataInputAbs,
+			OutputDir:              resolved.OutputAbs,
+			AttachedPicStreamIndex: probe.AttachedPicStreamIndex,
+			IncludeCover:           probe.HasAttachedPic,
+		}); err != nil {
+			return err
+		}
+		log.Printf("[mux] Done. Split audio written to %s", resolved.OutputAbs)
+		return nil
+	} else if resolved.MetadataInputAbs != "" {
+		log.Printf("[mux] Creating chaptered m4b at %s (bitrate - %s)", resolved.OutputAbs, resolved.Bitrate)
+		if err := media.CreateM4B(media.M4BOptions{
+			InputPath:              resolved.InputAbs,
+			MetadataPath:           resolved.MetadataInputAbs,
+			OutputPath:             resolved.OutputAbs,
+			Bitrate:                resolved.Bitrate,
+			AttachedPicStreamIndex: probe.AttachedPicStreamIndex,
+			IncludeCover:           probe.HasAttachedPic,
+		}); err != nil {
+			return err
+		}
+		log.Printf("[mux] Done. Muxxed audio written to %s", resolved.OutputAbs)
+		return nil
+	}
+
+	// initiate temporary workspace to store metadata and chunks
+	ws, err := workspace.New(resolved.TempDirAbs, "chapteriser-*", resolved.KeepTemp)
+	if err != nil {
+		return fmt.Errorf("Failed to create temp dir: %w", err)
+	} else {
+		log.Printf("[run] Creating temp dir: %s", ws.Dir)
+	}
+	if resolved.KeepTemp {
+		log.Printf("[run] Keeping temp dir: %s", ws.Dir)
+	}
+	defer ws.Cleanup()
+
+	// create temporary files
+	metadataPath := ws.Path("ffmetadata.txt")
 
 	// initialise Vosk model
 	model, err := transcribe.NewSharedModel(resolved.ModelPath)
@@ -225,7 +235,7 @@ func Run(cfg Config) error {
 		return firstErr
 	}
 
-	// ~~~ finish ~~~
+	// ~~~ finish ~~~ //
 	var final []domain.Chapter
 	for i := range ordered {
 		final = append(final, ordered[i]...)
@@ -276,7 +286,6 @@ func Run(cfg Config) error {
 		return err
 	}
 
-	// keep metadata if specified
 	if resolved.KeepTemp {
 		log.Printf("[metadata] Metadata in %s", ws.Dir)
 	}
