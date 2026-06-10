@@ -12,17 +12,24 @@
 
 ## Requirements
 
-- Go (for building)
+- Go
+- GCC C compiler
 - `ffmpeg` and `ffprobe`
 - System-installed Vosk library
 
 ## Build
 
+Build with:
 ```bash
-make build
+go run ./tools/build build
 ```
 
 This creates `./bin/chapteriser`.
+
+If you have `make` installed, this also works:
+```bash
+make build
+```
 
 ## Usage
 
@@ -54,6 +61,28 @@ Split by user provided metadata (skips detection):
 - `-bitrate` Output bitrate for `.m4b` (**default**: `96k`)
 
 You can tweak these to suit your desired memory and CPU usage.
+
+## Manual chapter corrections
+
+Because chapter detection is based on speech recognition and keyword matching, you may wish to manually correct chapters.
+
+If you want to review or edit the generated chapters, you could:–
+
+1. Generate metadata and keep temporary files:
+
+   ```bash
+   ./bin/chapteriser -i book.mp3 -keep-temp . -skip-mux
+   ```
+
+2. Edit the generated `ffmetadata.txt` file.
+
+3. Re-run chapteriser using the edited metadata and skip automatic detection:
+
+   ```bash
+   ./bin/chapteriser -i book.mp3 -metadata-input ./ffmetadata.txt
+   ```
+
+You can also combine `-metadata-input` with `-split-audio` to split audio using your manually edited chapter metadata.
 
 ## Limitations
 
