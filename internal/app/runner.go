@@ -179,9 +179,7 @@ func Run(cfg Config) error {
 	var wg sync.WaitGroup
 	var finalResultMu sync.Mutex
 	for range workerCount {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for job := range jobs {
 				select {
 				case <-ctx.Done():
@@ -209,7 +207,7 @@ func Run(cfg Config) error {
 					chapters: chapterList,
 				}
 			}
-		}()
+		})
 	}
 
 	// close results channel after all workers are done
