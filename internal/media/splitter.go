@@ -17,6 +17,7 @@ type SplitOptions struct {
 	OutputDir              string
 	AttachedPicStreamIndex int
 	IncludeCover           bool
+	FFmpegPath             string
 }
 
 var simpleNumberWords = map[string]int{
@@ -87,7 +88,7 @@ func SplitAudioFile(opts SplitOptions) error {
 		}
 		args = append(args, outputName)
 
-		cmd := exec.Command("ffmpeg", args...)
+		cmd := exec.Command(opts.FFmpegPath, args...)
 
 		var out bytes.Buffer
 		cmd.Stdout = &out

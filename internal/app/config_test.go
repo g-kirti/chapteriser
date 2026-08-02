@@ -140,3 +140,24 @@ func TestResolve_MetadataInputPath(t *testing.T) {
 		t.Fatalf("expected metadata input path to be resolved")
 	}
 }
+
+func TestResolve_ExternalToolPathsPropagation(t *testing.T) {
+	cfg := Config{
+		InputPath:       "book.mp3",
+		ModelPath:       "model",
+		VoskLibraryPath: "vosk/libvosk.so",
+		FFmpegPath:      "tools/ffmpeg",
+		FFprobePath:     "tools/ffprobe",
+		Workers:         0,
+		ChunkMinutes:    30,
+		Bitrate:         "96k",
+	}
+
+	resolved, err := cfg.Resolve()
+	if err != nil {
+		t.Fatalf("Resolve failed: %v", err)
+	}
+	if resolved.VoskLibraryPath != cfg.VoskLibraryPath || resolved.FFmpegPath != cfg.FFmpegPath || resolved.FFprobePath != cfg.FFprobePath {
+		t.Fatalf("external tool paths were not preserved: %#v", resolved)
+	}
+}

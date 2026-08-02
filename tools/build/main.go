@@ -48,7 +48,7 @@ func build() error {
 	if err := os.MkdirAll(filepath.Dir(binPath), 0o755); err != nil {
 		return err
 	}
-	if err := runCommand("go", "build", "-o", binPath, "."); err != nil {
+	if err := runCommand("go", "build", "-o", binPath, "./cmd/chapteriser"); err != nil {
 		return err
 	}
 	fmt.Println("Build done.")

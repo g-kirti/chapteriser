@@ -6,7 +6,9 @@ import (
 	"g-kirti/chapteriser/internal/domain"
 	"g-kirti/chapteriser/internal/media"
 	"g-kirti/chapteriser/internal/metadata"
+	"g-kirti/chapteriser/internal/platform"
 	"g-kirti/chapteriser/internal/transcribe"
+	"g-kirti/chapteriser/internal/vosk"
 	"g-kirti/chapteriser/internal/workspace"
 	"log"
 	"os"
@@ -71,10 +73,19 @@ func Run(cfg Config) error {
 	if err != nil {
 		return err
 	}
+	ffmpegPath, err := platform.FindTool("ffmpeg", resolved.FFmpegPath)
+	if err != nil {
+		return err
+	}
+	ffprobePath, err := platform.FindTool("ffprobe", resolved.FFprobePath)
+	if err != nil {
+		return err
+	}
+	modelPath := platform.ResolveModelPath(resolved.ModelPath)
 
 	// probe metadata
 	chunkSeconds := resolved.ChunkMinutes * 60
-	probe, err := media.ProbeInput(resolved.InputAbs)
+	probe, err := media.ProbeInput(resolved.InputAbs, ffprobePath)
 	if err != nil {
 		return err
 	}
@@ -105,6 +116,7 @@ func Run(cfg Config) error {
 			OutputDir:              resolved.OutputAbs,
 			AttachedPicStreamIndex: probe.AttachedPicStreamIndex,
 			IncludeCover:           probe.HasAttachedPic,
+			FFmpegPath:             ffmpegPath,
 		}); err != nil {
 			return err
 		}
@@ -119,6 +131,7 @@ func Run(cfg Config) error {
 			Bitrate:                resolved.Bitrate,
 			AttachedPicStreamIndex: probe.AttachedPicStreamIndex,
 			IncludeCover:           probe.HasAttachedPic,
+			FFmpegPath:             ffmpegPath,
 		}); err != nil {
 			return err
 		}
@@ -142,11 +155,18 @@ func Run(cfg Config) error {
 	metadataPath := ws.Path("ffmetadata.txt")
 
 	// initialise Vosk model
-	model, err := transcribe.NewSharedModel(resolved.ModelPath)
+	voskLibraryPath, err := platform.FindVoskLibrary(resolved.VoskLibraryPath)
+	if err != nil {
+		return err
+	}
+	if err := vosk.LoadLibrary(voskLibraryPath); err != nil {
+		return err
+	}
+	model, err := transcribe.NewSharedModel(modelPath)
 	if err != nil {
 		return err
 	} else {
-		log.Printf("[run] Vosk model at: %s created", resolved.ModelPath)
+		log.Printf("[run] Vosk model at: %s created", modelPath)
 	}
 	defer model.Free()
 
@@ -187,7 +207,7 @@ func Run(cfg Config) error {
 				default:
 				}
 
-				chapterList, err := transcribe.TranscribeChunkRange(ctx, model, resolved.InputAbs, job.startSec, job.durSec, &finalResultMu)
+				chapterList, err := transcribe.TranscribeChunkRange(ctx, model, ffmpegPath, resolved.InputAbs, job.startSec, job.durSec, &finalResultMu)
 				if err != nil {
 					results <- chunkResult{
 						index: job.index,
@@ -254,6 +274,7 @@ func Run(cfg Config) error {
 			OutputDir:              resolved.OutputAbs,
 			AttachedPicStreamIndex: probe.AttachedPicStreamIndex,
 			IncludeCover:           probe.HasAttachedPic,
+			FFmpegPath:             ffmpegPath,
 		}); err != nil {
 			return err
 		}
@@ -280,6 +301,7 @@ func Run(cfg Config) error {
 		Bitrate:                resolved.Bitrate,
 		AttachedPicStreamIndex: probe.AttachedPicStreamIndex,
 		IncludeCover:           probe.HasAttachedPic,
+		FFmpegPath:             ffmpegPath,
 	}); err != nil {
 		return err
 	}

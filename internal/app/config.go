@@ -9,16 +9,19 @@ import (
 )
 
 type Config struct {
-	InputPath     string
-	OutputPath    string
-	MetadataInput string
-	ModelPath     string
-	Workers       int
-	ChunkMinutes  int
-	Bitrate       string
-	SkipMux       bool
-	KeepTemp      string
-	SplitAudio    bool
+	InputPath       string
+	OutputPath      string
+	MetadataInput   string
+	ModelPath       string
+	VoskLibraryPath string
+	FFmpegPath      string
+	FFprobePath     string
+	Workers         int
+	ChunkMinutes    int
+	Bitrate         string
+	SkipMux         bool
+	KeepTemp        string
+	SplitAudio      bool
 }
 
 type ResolvedConfig struct {
@@ -26,6 +29,9 @@ type ResolvedConfig struct {
 	OutputAbs        string
 	MetadataInputAbs string
 	ModelPath        string
+	VoskLibraryPath  string
+	FFmpegPath       string
+	FFprobePath      string
 	TempDirAbs       string
 	Workers          int
 	ChunkMinutes     int
@@ -134,6 +140,9 @@ func (c Config) Resolve() (ResolvedConfig, error) {
 		OutputAbs:        outputAbs,
 		MetadataInputAbs: metadataInputAbs,
 		ModelPath:        c.ModelPath,
+		VoskLibraryPath:  c.VoskLibraryPath,
+		FFmpegPath:       c.FFmpegPath,
+		FFprobePath:      c.FFprobePath,
 		TempDirAbs:       tempDirAbs,
 		Workers:          c.Workers,
 		ChunkMinutes:     c.ChunkMinutes,

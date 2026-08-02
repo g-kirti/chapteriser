@@ -25,22 +25,23 @@ type M4BOptions struct {
 	Bitrate                string
 	AttachedPicStreamIndex int
 	IncludeCover           bool
+	FFmpegPath             string
 }
 
-func ProbeInput(inputPath string) (ProbeResult, error) {
-	tags, err := extractTags(inputPath)
+func ProbeInput(inputPath, ffprobePath string) (ProbeResult, error) {
+	tags, err := extractTags(inputPath, ffprobePath)
 	if err != nil {
 		return ProbeResult{}, err
 	}
-	attachedPicStreamIndex, hasAttachedPic, err := attachedPicStreamIndex(inputPath)
+	attachedPicStreamIndex, hasAttachedPic, err := attachedPicStreamIndex(inputPath, ffprobePath)
 	if err != nil {
 		return ProbeResult{}, err
 	}
-	hasAudio, err := hasAudioStream(inputPath)
+	hasAudio, err := hasAudioStream(inputPath, ffprobePath)
 	if err != nil {
 		return ProbeResult{}, err
 	}
-	durationSeconds, err := durationSeconds(inputPath)
+	durationSeconds, err := durationSeconds(inputPath, ffprobePath)
 	if err != nil {
 		return ProbeResult{}, err
 	}
@@ -53,9 +54,9 @@ func ProbeInput(inputPath string) (ProbeResult, error) {
 	}, nil
 }
 
-func durationSeconds(inputPath string) (int, error) {
+func durationSeconds(inputPath, ffprobePath string) (int, error) {
 	cmd := exec.Command(
-		"ffprobe",
+		ffprobePath,
 		"-v", "error",
 		"-show_entries", "format=duration",
 		"-of", "csv=p=0",
@@ -84,9 +85,9 @@ func durationSeconds(inputPath string) (int, error) {
 	return total, nil
 }
 
-func hasAudioStream(inputPath string) (bool, error) {
+func hasAudioStream(inputPath, ffprobePath string) (bool, error) {
 	cmd := exec.Command(
-		"ffprobe",
+		ffprobePath,
 		"-v", "error",
 		"-select_streams", "a",
 		"-show_entries", "stream=index",
@@ -106,9 +107,9 @@ func hasAudioStream(inputPath string) (bool, error) {
 	return strings.TrimSpace(stdout.String()) != "", nil
 }
 
-func extractTags(inputPath string) (map[string]string, error) {
+func extractTags(inputPath, ffprobePath string) (map[string]string, error) {
 	cmd := exec.Command(
-		"ffprobe",
+		ffprobePath,
 		"-v", "error",
 		"-print_format", "json",
 		"-show_entries", "format_tags",
@@ -172,9 +173,9 @@ func extractTags(inputPath string) (map[string]string, error) {
 	return result, nil
 }
 
-func attachedPicStreamIndex(inputPath string) (int, bool, error) {
+func attachedPicStreamIndex(inputPath, ffprobePath string) (int, bool, error) {
 	cmd := exec.Command(
-		"ffprobe",
+		ffprobePath,
 		"-v", "error",
 		"-print_format", "json",
 		"-select_streams", "v",
@@ -243,7 +244,7 @@ func CreateM4B(opts M4BOptions) error {
 	}
 	args = append(args, opts.OutputPath)
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command(opts.FFmpegPath, args...)
 
 	var out bytes.Buffer
 	cmd.Stdout = &out

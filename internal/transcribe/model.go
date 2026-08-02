@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"sync"
 
-	vosk "github.com/alphacep/vosk-api/go"
+	"g-kirti/chapteriser/internal/vosk"
 )
 
-func NewSharedModel(modelPath string) (*vosk.VoskModel, error) {
+func NewSharedModel(modelPath string) (*vosk.Model, error) {
 	vosk.SetLogLevel(-1)
 	model, err := vosk.NewModel(modelPath)
 	if err != nil {
@@ -22,7 +22,7 @@ func NewSharedModel(modelPath string) (*vosk.VoskModel, error) {
 	return model, nil
 }
 
-func TranscribeChunkRange(ctx context.Context, model *vosk.VoskModel, inputPath string, startSeconds int, durationSeconds int, finalResultMu *sync.Mutex) ([]domain.Chapter, error) {
+func TranscribeChunkRange(ctx context.Context, model *vosk.Model, ffmpegPath, inputPath string, startSeconds int, durationSeconds int, finalResultMu *sync.Mutex) ([]domain.Chapter, error) {
 	sampleRate := 16000.0
 	rec, err := vosk.NewRecognizer(model, sampleRate)
 	if err != nil {
@@ -30,7 +30,7 @@ func TranscribeChunkRange(ctx context.Context, model *vosk.VoskModel, inputPath 
 	}
 	defer rec.Free()
 
-	rec.SetWords(1)
+	rec.SetWords(true)
 
 	args := []string{
 		"-hide_banner",
@@ -45,7 +45,7 @@ func TranscribeChunkRange(ctx context.Context, model *vosk.VoskModel, inputPath 
 		"-acodec", "pcm_s16le",
 		"pipe:1",
 	}
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
 
 	var ffmpegErr bytes.Buffer
 	cmd.Stderr = &ffmpegErr
