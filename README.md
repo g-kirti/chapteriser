@@ -1,56 +1,60 @@
 # chapteriser
 
-`chapteriser` is a Go tool that uses goroutines to scan monolithic audiobooks, detect chapters and key sections, and generate `ffmetadata.txt`, with options to mux into a chaptered `.m4b` or split by chapter.
+`chapteriser` detects spoken chapter headings in long audio files, writes FFmpeg chapter metadata, and can create a chaptered `.m4b` or separate audio files.
 
-## How it works
+## Install
 
-1. Splits audio into chunks
-2. Runs speech recognition on each chunk
-3. Detects phrases like "Chapter 5", "Introduction", etc.
-4. Generates `ffmetadata.txt`
-5. Muxes input into an `.m4b` or splits it by chapter
+Release bundles include the application, Vosk speech-recognition engine, English model, FFmpeg, and FFprobe. They support 64-bit Windows and 64-bit Linux.
 
-## Requirements
+### Windows
 
-- Go
-- GCC C compiler
-- `ffmpeg` and `ffprobe`
-- System-installed Vosk library
+1. Download `chapteriser_<version>_windows_amd64.zip` from the [latest release](https://github.com/g-kirti/chapteriser/releases/latest) and extract it.
+2. In PowerShell, run the extracted `install.ps1`:
 
-## Build
+   ```powershell
+   Set-ExecutionPolicy -Scope Process Bypass
+   .\install.ps1
+   ```
 
-Build with:
-```bash
-go run ./tools/build build
-```
+3. Open a new terminal and run `chapteriser -version`.
 
-This creates `./bin/chapteriser`.
+The installer places the bundle in `%LOCALAPPDATA%\Programs\chapteriser` and adds it to your user `PATH`. Run `uninstall.ps1` from that directory to remove it.
 
-If you have `make` installed, this also works:
-```bash
-make build
-```
+### Linux
+
+1. Download `chapteriser_<version>_linux_amd64.tar.gz` from the [latest release](https://github.com/g-kirti/chapteriser/releases/latest).
+2. Extract it and run the included installer:
+
+   ```sh
+   tar -xzf chapteriser_<version>_linux_amd64.tar.gz
+   cd chapteriser_<version>_linux_amd64
+   ./install.sh
+   ```
+
+3. Ensure `~/.local/bin` is on `PATH`, open a new shell, then run `chapteriser -version`.
+
+The installer stores the bundle in `~/.local/lib/chapteriser` and creates `~/.local/bin/chapteriser`. Run `~/.local/lib/chapteriser/uninstall.sh` to remove it.
 
 ## Usage
 
-Create a chaptered `.m4b` (default):
-```bash
-./bin/chapteriser -i book.mp3 -o title
+Create a chaptered `.m4b`:
+```sh
+chapteriser -i book.mp3 -o title
 ```
 
-Keep temp files in current directory and skip muxxing:
-```bash
-./bin/chapteriser -i book.mp3 -keep-temp . -skip-mux
+Keep temporary files in the current directory and only generate metadata:
+```sh
+chapteriser -i book.mp3 -keep-temp . -skip-mux
 ```
 
-Split by detected chapters:
-```bash
-./bin/chapteriser -i book.mp3 -split-audio
+Split the input into detected chapter files:
+```sh
+chapteriser -i book.mp3 -split-audio
 ```
 
-Split by user provided metadata (skips detection):
-```bash
-./bin/chapteriser -i book.mp3 -split-audio -metadata-input /path/to/ffmetadata.txt
+Split using manually edited FFmpeg metadata rather than automatic detection:
+```sh
+chapteriser -i book.mp3 -split-audio -metadata-input ffmetadata.txt
 ```
 
 ### Useful flags
@@ -71,7 +75,7 @@ If you want to review or edit the generated chapters, you could:–
 1. Generate metadata and keep temporary files:
 
    ```bash
-   ./bin/chapteriser -i book.mp3 -keep-temp . -skip-mux
+   chapteriser -i book.mp3 -keep-temp . -skip-mux
    ```
 
 2. Edit the generated `ffmetadata.txt` file.
@@ -79,13 +83,13 @@ If you want to review or edit the generated chapters, you could:–
 3. Re-run chapteriser using the edited metadata and skip automatic detection:
 
    ```bash
-   ./bin/chapteriser -i book.mp3 -metadata-input ./ffmetadata.txt
+   chapteriser -i book.mp3 -metadata-input ./ffmetadata.txt
    ```
 
 You can also combine `-metadata-input` with `-split-audio` to split audio using your manually edited chapter metadata.
 
 ## Limitations
 
-- Works best when chapter titles are spoken clearly
-- May include false positive headings when keywords are spoken in dialogue
+- Detection works best when headings are spoken clearly
+- Dialogue can produce false-positive headings
 - Only English for now
