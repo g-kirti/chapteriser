@@ -7,11 +7,26 @@ import (
 	"g-kirti/chapteriser/internal/domain"
 	"io"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"sync"
 
 	"g-kirti/chapteriser/internal/vosk"
 )
+
+var voskLangRegex = regexp.MustCompile(`^vosk-model-(?:small-)?([a-z]{2})-`)
+
+func ExtractLangCode(dirPath string) (string, bool) {
+	cleaned := filepath.Clean(dirPath)
+	dirName := filepath.Base(cleaned)
+
+	matches := voskLangRegex.FindStringSubmatch(dirName)
+	if len(matches) < 2 {
+		return "", false
+	}
+	return matches[1], true
+}
 
 func NewSharedModel(modelPath string) (*vosk.Model, error) {
 	vosk.SetLogLevel(-1)
@@ -22,7 +37,7 @@ func NewSharedModel(modelPath string) (*vosk.Model, error) {
 	return model, nil
 }
 
-func TranscribeChunkRange(ctx context.Context, model *vosk.Model, ffmpegPath, inputPath string, startSeconds int, durationSeconds int, finalResultMu *sync.Mutex) ([]domain.Chapter, error) {
+func TranscribeChunkRange(ctx context.Context, model *vosk.Model, ffmpegPath string, langCode string, inputPath string, startSeconds int, durationSeconds int, finalResultMu *sync.Mutex) ([]domain.Chapter, error) {
 	sampleRate := 16000.0
 	rec, err := vosk.NewRecognizer(model, sampleRate)
 	if err != nil {
@@ -95,5 +110,5 @@ func TranscribeChunkRange(ctx context.Context, model *vosk.Model, ffmpegPath, in
 		jsonString = rec.FinalResult()
 	}
 
-	return FindHeadings(jsonString), nil
+	return FindHeadings(jsonString, langCode), nil
 }

@@ -16,6 +16,7 @@ func main() {
 
 	flag.StringVar(&cfg.InputPath, "i", "", "input audio file (any ffmpeg-readable format)")
 	flag.StringVar(&cfg.OutputPath, "o", "", "output .m4b file path")
+	flag.StringVar(&cfg.Language, "lang", cfg.Language, "language of model used")
 	flag.StringVar(&cfg.MetadataInput, "metadata-input", "", "path to an existing ffmetadata.txt file")
 	flag.StringVar(&cfg.ModelPath, "model-path", cfg.ModelPath, "path to Vosk model directory")
 	flag.StringVar(&cfg.VoskLibraryPath, "vosk-lib", "", "path to libvosk shared library (defaults to bundled library)")

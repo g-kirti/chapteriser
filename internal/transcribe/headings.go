@@ -17,52 +17,46 @@ const (
 	numTens
 	numScale
 	numAnd
+	numTeenBase
 )
 
-func numberWordType(word string) int {
-	switch word {
-	case "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-		"ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
-		"eighteen", "nineteen":
-		return numUnit
-	case "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety":
-		return numTens
-	case "hundred", "thousand":
-		return numScale
-	case "and":
-		return numAnd
-	default:
-		return numUnknown
+func numberWordType(word string, wordTypes map[string]int) int {
+	if t, ok := wordTypes[word]; ok {
+		return t
 	}
+	return numUnknown
 }
 
-func canAppendNumberWord(prevWord string, nextWord string) bool {
-	prevType := numberWordType(prevWord)
-	nextType := numberWordType(nextWord)
+func canAppendNumberWord(prevWord string, nextWord string, wordTypes map[string]int, andFollowsTypes map[int]bool) bool {
+	prevType := numberWordType(prevWord, wordTypes)
+	nextType := numberWordType(nextWord, wordTypes)
 	if nextType == numUnknown {
 		return false
 	}
 	if nextType == numAnd {
-		return prevType == numScale
+		return andFollowsTypes[prevType]
 	}
 	if prevType == numAnd {
 		return nextType == numUnit || nextType == numTens
 	}
-	if prevType == numTens {
-		return nextType == numUnit
-	}
 	if prevType == numUnit {
 		return nextType == numScale
 	}
+	if prevType == numTens {
+		return nextType == numUnit || nextType == numScale || nextType == numTeenBase
+	}
 	if prevType == numScale {
-		return nextType == numUnit || nextType == numTens || nextType == numAnd
+		return nextType == numUnit || nextType == numTens || nextType == numScale
+	}
+	if prevType == numTeenBase {
+		return nextType == numUnit || nextType == numScale
 	}
 	return false
 }
 
-func canStartChapterNumber(word string) bool {
-	t := numberWordType(word)
-	return t == numUnit || t == numTens
+func canStartChapterNumber(word string, wordTypes map[string]int) bool {
+	t := numberWordType(word, wordTypes)
+	return t == numUnit || t == numTens || t == numScale || t == numTeenBase
 }
 
 func shouldAcceptStandaloneHeading(words []struct {
@@ -74,7 +68,6 @@ func shouldAcceptStandaloneHeading(words []struct {
 		return false
 	}
 	curr := words[idx]
-
 	if curr.Start <= standaloneHeadingNearBoundarySeconds {
 		return true
 	}
@@ -88,7 +81,7 @@ func shouldAcceptStandaloneHeading(words []struct {
 	return false
 }
 
-func FindHeadings(resultJSON string) []domain.Chapter {
+func FindHeadings(resultJSON string, langCode string) []domain.Chapter {
 	var result struct {
 		Result []struct {
 			Word  string  `json:"word"`
@@ -96,38 +89,18 @@ func FindHeadings(resultJSON string) []domain.Chapter {
 			End   float64 `json:"end"`
 		} `json:"result"`
 	}
-
 	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
 		log.Println("[transcribe] Failed to parse JSON:", err)
 		return nil
 	}
 
-	keywords := map[string]bool{
-		"book":    true,
-		"chapter": true,
-		"volume":  true,
-		"part":    true,
-	}
-	standaloneKeywords := map[string]bool{
-		"introduction": true,
-		"prologue":     true,
-		"epilogue":     true,
-		"foreword":     true,
-		"afterword":    true,
-	}
-
-	numberWords := map[string]bool{
-		"zero": true, "one": true, "two": true, "three": true, "four": true,
-		"five": true, "six": true, "seven": true, "eight": true, "nine": true,
-		"ten": true, "eleven": true, "twelve": true, "thirteen": true, "fourteen": true,
-		"fifteen": true, "sixteen": true, "seventeen": true, "eighteen": true, "nineteen": true,
-		"twenty": true, "thirty": true, "forty": true, "fifty": true, "sixty": true,
-		"seventy": true, "eighty": true, "ninety": true, "hundred": true,
-		"thousand": true, "and": true,
-	}
+	lang := LanguageRegistry[langCode]
+	keywords := lang.Keywords
+	standaloneKeywords := lang.StandaloneKeywords
+	numberWordTypes := lang.NumberWordTypes
+	andFollowsTypes := lang.AndFollowsTypes
 
 	var chapterList []domain.Chapter
-
 	for i := 0; i < len(result.Result); i++ {
 		curr := result.Result[i]
 		if standaloneKeywords[curr.Word] && shouldAcceptStandaloneHeading(result.Result, i) {
@@ -142,11 +115,9 @@ func FindHeadings(resultJSON string) []domain.Chapter {
 		if !keywords[curr.Word] {
 			continue
 		}
-
 		phrase := []string{curr.Word}
 		startTime := curr.Start
 		endTime := curr.End
-
 		j := i + 1
 		for j < len(result.Result) {
 			prev := result.Result[j-1]
@@ -155,7 +126,7 @@ func FindHeadings(resultJSON string) []domain.Chapter {
 				break
 			}
 			if len(phrase) == 1 {
-				if numberWords[next.Word] && canStartChapterNumber(next.Word) {
+				if canStartChapterNumber(next.Word, numberWordTypes) {
 					phrase = append(phrase, next.Word)
 					endTime = next.End
 					j++
@@ -164,7 +135,7 @@ func FindHeadings(resultJSON string) []domain.Chapter {
 				break
 			}
 			lastNumberWord := phrase[len(phrase)-1]
-			if numberWords[next.Word] && canAppendNumberWord(lastNumberWord, next.Word) {
+			if canAppendNumberWord(lastNumberWord, next.Word, numberWordTypes, andFollowsTypes) {
 				phrase = append(phrase, next.Word)
 				endTime = next.End
 				j++
@@ -172,11 +143,9 @@ func FindHeadings(resultJSON string) []domain.Chapter {
 				break
 			}
 		}
-
 		if len(phrase) > 1 {
 			joinedPhrase := strings.Join(phrase, " ")
-			log.Printf("[transcribe] Found '%s' at [%.2fs - %.2fs]\n", strings.Join(phrase, " "), startTime, endTime)
-
+			log.Printf("[transcribe] Found '%s' at [%.2fs - %.2fs]\n", joinedPhrase, startTime, endTime)
 			chapterList = append(chapterList, domain.Chapter{
 				Title: joinedPhrase,
 				Start: startTime,

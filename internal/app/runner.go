@@ -154,6 +154,18 @@ func Run(cfg Config) error {
 	// create temporary files
 	metadataPath := ws.Path("ffmetadata.txt")
 
+	// detect language
+	if lang, ok := transcribe.ExtractLangCode(modelPath); ok {
+		if _, err := normaliseLanguageCode(lang); err == nil {
+			resolved.Language = lang
+			log.Printf("[run] Language detected. Set to: %s", lang)
+		} else {
+			log.Printf("[run] Language detected from model path not supported. Defaulting to: %s", resolved.Language)
+		}
+	} else {
+		log.Printf("[run] Language not detected from model path. Defaulting to: %s", resolved.Language)
+	}
+
 	// initialise Vosk model
 	voskLibraryPath, err := platform.FindVoskLibrary(resolved.VoskLibraryPath)
 	if err != nil {
@@ -207,7 +219,7 @@ func Run(cfg Config) error {
 				default:
 				}
 
-				chapterList, err := transcribe.TranscribeChunkRange(ctx, model, ffmpegPath, resolved.InputAbs, job.startSec, job.durSec, &finalResultMu)
+				chapterList, err := transcribe.TranscribeChunkRange(ctx, model, ffmpegPath, resolved.Language, resolved.InputAbs, job.startSec, job.durSec, &finalResultMu)
 				if err != nil {
 					results <- chunkResult{
 						index: job.index,

@@ -9,6 +9,7 @@ import (
 )
 
 type Config struct {
+	Language        string
 	InputPath       string
 	OutputPath      string
 	MetadataInput   string
@@ -25,6 +26,7 @@ type Config struct {
 }
 
 type ResolvedConfig struct {
+	Language         string
 	InputAbs         string
 	OutputAbs        string
 	MetadataInputAbs string
@@ -43,6 +45,7 @@ type ResolvedConfig struct {
 
 func DefaultConfig() Config {
 	return Config{
+		Language:     "en",
 		ModelPath:    "model/vosk-model-small-en-us-0.15",
 		Workers:      4,
 		ChunkMinutes: 30,
@@ -59,6 +62,21 @@ func defaultOutputPath(inputPath string) string {
 func defaultSplitOutputPath(inputPath string) string {
 	ext := filepath.Ext(inputPath)
 	return strings.TrimSuffix(inputPath, ext)
+}
+
+func normaliseLanguageCode(userInput string) (string, error) {
+	cleanInput := strings.TrimSpace(strings.ToLower(userInput))
+
+	switch cleanInput {
+	case "en", "english", "eng":
+		return "en", nil
+	case "es", "spanish", "spa", "español", "espanol":
+		return "es", nil
+	case "fr", "french", "fre", "fra", "français", "francais":
+		return "fr", nil
+	default:
+		return "", fmt.Errorf("%q is unsupported.", userInput)
+	}
 }
 
 var bitratePattern = regexp.MustCompile(`(?i)^[1-9][0-9]*(k|m)$`)
@@ -96,6 +114,11 @@ func (c Config) Resolve() (ResolvedConfig, error) {
 		default:
 			keepTemp = true
 		}
+	}
+
+	langCode, err := normaliseLanguageCode(c.Language)
+	if err != nil {
+		return ResolvedConfig{}, fmt.Errorf("Failed to resolve language: %w", err)
 	}
 
 	outputPath := c.OutputPath
@@ -138,6 +161,7 @@ func (c Config) Resolve() (ResolvedConfig, error) {
 	return ResolvedConfig{
 		InputAbs:         inputAbs,
 		OutputAbs:        outputAbs,
+		Language:         langCode,
 		MetadataInputAbs: metadataInputAbs,
 		ModelPath:        c.ModelPath,
 		VoskLibraryPath:  c.VoskLibraryPath,

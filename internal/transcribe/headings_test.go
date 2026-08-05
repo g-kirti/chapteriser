@@ -8,7 +8,7 @@ func TestFindHeadings_NumberedChapter(t *testing.T) {
 		{"word":"one","start":1.21,"end":1.35}
 	]}`
 
-	chapters := FindHeadings(json)
+	chapters := FindHeadings(json, "en")
 	if len(chapters) != 1 {
 		t.Fatalf("expected 1 chapter, got %d", len(chapters))
 	}
@@ -24,7 +24,7 @@ func TestFindHeadings_DoesNotAppendFollowingSentenceWord(t *testing.T) {
 		{"word":"three","start":11.30,"end":11.45}
 	]}`
 
-	chapters := FindHeadings(json)
+	chapters := FindHeadings(json, "en")
 	if len(chapters) != 1 {
 		t.Fatalf("expected 1 chapter, got %d", len(chapters))
 	}
@@ -42,7 +42,7 @@ func TestFindHeadings_StandaloneHeadingNeedsBoundaryOrGap(t *testing.T) {
 		{"word":"epilogue","start":400.00,"end":400.20}
 	]}`
 
-	chapters := FindHeadings(json)
+	chapters := FindHeadings(json, "en")
 	if len(chapters) != 2 {
 		t.Fatalf("expected 2 chapters, got %d", len(chapters))
 	}
